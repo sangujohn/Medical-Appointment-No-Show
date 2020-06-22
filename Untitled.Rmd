@@ -1,10 +1,4 @@
----
-title: "speed-and-distance"
-output: html_document
----
-```{r}
 
-```
 
 library(readr)
 library(dplyr)
@@ -35,26 +29,427 @@ appointment$AppmtWeekday<-parse_date_time(appointment$AppointmentDay,orders=c('Y
 appointment$AppmtWeekday<-weekdays(appointment$AppmtWeekday)
 
 ggplot(appointment,aes(x=AppmtWeekday,fill=No.show))+geom_bar(stat = "count")
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
-## R Markdown
+appointment$ScheduleddWeekday<-parse_date_time(appointment$ScheduledDay,orders=c('Ymd HMS','dmY HM'))
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+appointment$ScheduleddWeekday<-weekdays(appointment$ScheduleddWeekday)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+ggplot(appointment,aes(x=ScheduleddWeekday,fill=No.show))+geom_bar(stat = "count")
 
-```{r cars}
-summary(cars)
-```
+appointment$AppmtBookingHour<-parse_date_time(appointment$ScheduledDay,orders=c('Ymd HMS','dmY HM'))
 
-## Including Plots
+appointment$AppmtBookingHour<-hour(appointment$AppmtBookingHour)
 
-You can also embed plots, for example:
+appointment$PartOfDay<-cut(as.numeric(appointment$AppmtBookingHour),breaks=c(0,4,9,11,16,21),labels=c('Night','EarlyMorning','LateMorning','Afternoon','Evening'),include.lowest = TRUE)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+ggplot(appointment,aes(x=PartOfDay,fill=No.show))+geom_bar(stat = "count")
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+appointment$ScheduledDayInMonth<-parse_date_time(appointment$ScheduledDay,orders=c('Ymd HMS','dmY HM'))
+
+appointment$AppointmentDayInMonth<-parse_date_time(appointment$AppointmentDay,orders=c('Ymd HMS','dmY HM'))
+
+appointment$ScheduleVsAppointmentDiff<-difftime(appointment$AppointmentDay,appointment$ScheduledDay,units = "days")
+
+head(appointment$ScheduleVsAppointmentDiff)
+
+
+
+appointment$ScheduledDayInMonth<-day(appointment$ScheduledDayInMonth)
+
+appointment$AppointmentDayInMonth<-day(appointment$AppointmentDayInMonth)
+
+getwd()
+
+write.csv(appointment, file = "appointment.csv")
+
+appointment_copy<- DS1
+
+head(appointment_copy)
+
+appointment <- DS1
+
+DS <- read.csv(file="/Users/sangujohn/Downloads/No_Show.csv", header=TRUE, sep=",")
+
+
+appointment$ScheduledDay<-NULL
+appointment$AppointmentDay<-NULL
+
+head(appointment)
+# appointment$Age<-scale(appointment$Age)
+
+
+appointment$AppmtBookingHour<-scale(as.numeric(appointment$AppmtBookingHour))
+appointment$ScheduledDayInMonth<-scale(appointment$ScheduledDayInMonth)
+appointment$AppointmentDayInMonth<-scale(appointment$AppointmentDayInMonth)
+appointment$ScheduleVsAppointmentDiff<-scale(appointment$ScheduleVsAppointmentDiff)
+
+appointment$Scholarship<-ifelse(appointment$Scholarship==1,"Yes","No")
+appointment$Hipertension<-ifelse(appointment$Hipertension==1,"Yes","No")
+appointment$Diabetes<-ifelse(appointment$Diabetes==1,"Yes","No")
+appointment$Alcoholism<-ifelse(appointment$Alcoholism==1,"Yes","No")
+appointment$Handcap<-ifelse(appointment$Handcap==1,"Yes","No")
+colnames(appointment)
+appointment$SMS_received<-ifelse(appointment$SMS_received==1,"Yes","No")
+appointment$X<- NULL
+appointment$PatientId<- NULL
+appointment$AppointmentID<- NULL
+
+
+ncol(appointment)
+colnames(appointment)
+
+
+
+appointment_chr<-appointment[,-c(2,13,15,16,17)]
+head(appointment_chr)
+nrow(appointment_chr)
+ncol(appointment_chr)
+
+appointment_fact<- data.frame(sapply(appointment_chr, function(x) factor(x)))
+
+dummies<- data.frame(sapply(appointment_fact, 
+                            function(x) data.frame(model.matrix(~x-1,data =appointment_fact))[,-1]))
+
+
+appointment_final<- cbind(appointment[,c(2,13,15,16,17)],dummies) 
+
+head(appointment_final)
+colnames(appointment_final)
+
+write.csv(appointment_final, file="appointment_final.csv")
+# Train and Test splitting
+
+library(caTools)
+
+appointment_final <- read.csv(file="/Users/sangujohn/Documents/DM2_Project/appointment_final.csv", header=TRUE, sep=",")
+
+set.seed(122)
+
+indices = sample.split(appointment_final$No.show, SplitRatio = 0.7)
+
+train = appointment_final[indices,]
+
+test = appointment_final[!(indices),]
+
+nrow(train)
+nrow(test)
+ncol(train)
+head(train)
+head(test)
+colnames(test)
+model_1 = glm(No.show ~ ., data = train, family = "binomial")
+summary(model_1) #AIC 4150.1....31 coeff..nullDev 5699.5...resDev 4102.1
+
+# Stepwise selection
+library("MASS")
+model_2<- stepAIC(model_1, direction="both")
+
+model_3<- glm(No.show ~  AppmtBookingHour + ScheduledDayInMonth + AppointmentDayInMonth + 
+                ScheduleVsAppointmentDiff + 
+                Scholarship +  Diabetes + Alcoholism +
+                SMS_received + AgeGroup.x11.20 + AgeGroup.x21.30 + 
+                AgeGroup.x51.60 + AgeGroup.x61.70 + AgeGroup.x71.80 + 
+                AgeGroup.x81.90 + AppmtWeekday.xMonday + 
+                AppmtWeekday.xThursday + AppmtWeekday.xTuesday + 
+                AppmtWeekday.xWednesday + 
+                PartOfDay.xEarlyMorning + 
+                PartOfDay.xLateMorning, data = train, family = "binomial")
+
+
+summary(model_3)
+
+head(model_3)
+
+
+# Removing Early Morning 
+
+
+model_4<- glm(No.show ~  AppmtBookingHour + ScheduledDayInMonth + AppointmentDayInMonth + 
+                ScheduleVsAppointmentDiff + 
+                Scholarship +  Diabetes + Alcoholism +
+                SMS_received + AgeGroup.x11.20 + AgeGroup.x21.30 + 
+                AgeGroup.x51.60 + AgeGroup.x61.70 + AgeGroup.x71.80 + 
+                AgeGroup.x81.90 + AppmtWeekday.xMonday + 
+                AppmtWeekday.xThursday + AppmtWeekday.xTuesday + 
+                AppmtWeekday.xWednesday + 
+                PartOfDay.xLateMorning, data = train, family = "binomial")
+summary(model_4)
+
+vif(model_4)
+
+
+#Removing xMonday as it has less significance compared to others.
+model_5<- glm(No.show ~  AppmtBookingHour + ScheduledDayInMonth + AppointmentDayInMonth + 
+                ScheduleVsAppointmentDiff + 
+                Scholarship +  Diabetes + Alcoholism +
+                SMS_received + AgeGroup.x11.20 + AgeGroup.x21.30 + 
+                AgeGroup.x51.60 + AgeGroup.x61.70 + AgeGroup.x71.80 + 
+                AgeGroup.x81.90 + 
+                AppmtWeekday.xThursday + AppmtWeekday.xTuesday + 
+                AppmtWeekday.xWednesday + 
+                PartOfDay.xLateMorning, data = train, family = "binomial")
+summary(model_5)
+vif(model_5)
+
+#Removing xThursday as it has less significance compared to others.
+model_6<- glm(No.show ~  AppmtBookingHour + ScheduledDayInMonth + AppointmentDayInMonth + 
+                ScheduleVsAppointmentDiff + 
+                Scholarship +  Diabetes + Alcoholism +
+                SMS_received + AgeGroup.x11.20 + AgeGroup.x21.30 + 
+                AgeGroup.x51.60 + AgeGroup.x61.70 + AgeGroup.x71.80 + 
+                AgeGroup.x81.90 + 
+                AppmtWeekday.xTuesday + 
+                AppmtWeekday.xWednesday + 
+                PartOfDay.xLateMorning, data = train, family = "binomial")
+summary(model_6)
+vif(model_6)
+
+model_7<- glm(No.show ~  AppmtBookingHour + ScheduledDayInMonth + AppointmentDayInMonth + 
+                ScheduleVsAppointmentDiff + 
+                Scholarship +  Diabetes + Alcoholism +
+                SMS_received + AgeGroup.x11.20 + AgeGroup.x21.30 + 
+                AgeGroup.x51.60 + AgeGroup.x61.70 + AgeGroup.x71.80 + 
+                AgeGroup.x81.90 + 
+                AppmtWeekday.xWednesday + 
+                PartOfDay.xLateMorning, data = train, family = "binomial")
+summary(model_7)
+
+model_8<- glm(No.show ~  AppmtBookingHour + ScheduledDayInMonth + AppointmentDayInMonth + 
+                ScheduleVsAppointmentDiff + 
+                Scholarship +  Diabetes + Alcoholism +
+                SMS_received + AgeGroup.x11.20 + AgeGroup.x21.30 + 
+                AgeGroup.x51.60 + AgeGroup.x61.70 + AgeGroup.x71.80 + 
+                AgeGroup.x81.90 + 
+                PartOfDay.xLateMorning, data = train, family = "binomial")
+summary(model_8)
+
+
+model_9<- glm(No.show ~  AppmtBookingHour + ScheduledDayInMonth + 
+                ScheduleVsAppointmentDiff + 
+                Scholarship +  Diabetes + Alcoholism +
+                SMS_received + AgeGroup.x11.20 + AgeGroup.x21.30 + 
+                AgeGroup.x51.60 + AgeGroup.x61.70 + AgeGroup.x71.80 + 
+                AgeGroup.x81.90 + 
+                PartOfDay.xLateMorning, data = train, family = "binomial")
+summary(model_9)
+vif(model_9)
+
+final_model<- model_9
+
+library(caret)
+
+colnames(train)
+colnames(test)
+test_predicted = predict(final_model, type = "response", newdata = test[,-94])
+
+#Check the summary
+summary(test_predicted)
+test$prob <- test_predicted
+
+
+# Let's use the probability cutoff of 50% and see the predicted c
+test_predicted_noshow <- factor(ifelse(test_predicted >= 0.50, "Yes", "No"))
+test_actual_noshow <- factor(ifelse(test$No.show==1,"Yes","No"))
+table(test_actual_noshow,test_predicted_noshow)
+
+conf_matrix <- confusionMatrix(test_predicted_noshow, test_actual_noshow, positive = "Yes")
+conf_matrix
+
+
+
+#Create a function for calculating the sensitivity, specificity, accuracy for various values of cut off.
+perform_fn <- function(cutoff) 
+{
+  test_predicted_noshow <- factor(ifelse(test_predicted >= cutoff, "Yes", "No"))
+  print("printing confusion matrix")
+  conf <- confusionMatrix(test_predicted_noshow, test_actual_noshow, positive = "Yes")
+  acc <- conf$overall[1]
+  sens <- conf$byClass[1]
+  spec <- conf$byClass[2]
+  out <- t(as.matrix(c(sens, spec, acc)))  
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+
+levels(test_predicted_noshow)
+levels(test_actual_noshow)
+perform_fn(0.50)
+
+
+# Summary of test probability
+
+summary(test_predicted)
+
+s = seq(.01,.80,length=100)
+
+OUT = matrix(0,100,3)
+
+
+for(i in 1:100)
+{
+  OUT[i,] = perform_fn(s[i])
+} 
+
+OUT
+
+
+plot(s, OUT[,1],xlab="Cutoff",ylab="Value",cex.lab=1.5,cex.axis=1.5,ylim=c(0,1),type="l",lwd=2,axes=FALSE,col=2)
+axis(1,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+axis(2,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+lines(s,OUT[,2],col="darkgreen",lwd=2)
+lines(s,OUT[,3],col=4,lwd=2)
+box()
+legend(0,.50,col=c(2,"darkgreen",4,"darkred"),lwd=c(2,2,2,2),c("Sensitivity","Specificity","Accuracy"))
+cutoff <- s[which(abs(OUT[,1]-OUT[,2])<0.01)]
+cutoff
+
+# To improve accuracy choosing cut off as 0.5
+
+test_cutoff_noshow <- factor(ifelse(test_predicted >=0.50, "Yes", "No"))
+
+conf_final <- confusionMatrix(test_cutoff_noshow, test_actual_noshow, positive = "Yes")
+
+acc <- conf_final$overall[1]
+
+sens <- conf_final$byClass[1]
+
+spec <- conf_final$byClass[2]
+
+acc
+
+sens
+
+spec
+
+
+# To improve sensitivity we will try to use cut off as 0.1935
+test_cutoff_noshow <- factor(ifelse(test_predicted >=0.1935, "Yes", "No"))
+
+conf_final <- confusionMatrix(test_cutoff_noshow, test_actual_noshow, positive = "Yes")
+
+conf_final
+
+acc <- conf_final$overall[1]
+
+sens <- conf_final$byClass[1]
+
+spec <- conf_final$byClass[2]
+acc
+sens
+spec
+
+
+# Fitting Random Forest
+
+install.packages("randomForest")
+library(randomForest)
+
+
+library(caTools)
+
+
+head(train)
+colnames(train)
+
+train_rf<- train[,c(1:6,87:106)]
+
+train_rf$No.show <- factor(train_rf$No.show)
+
+test_rf$No.show <- factor(test_rf$No.show)
+
+
+write.csv(train_rf, file="train_rf.csv")
+write.csv(test_rf, file="test_rf.csv")
+
+test_rf<- test[,c(1:6,87:106)]
+ncol(train_rf)
+nrow(train_rf)
+head(train_rf)
+
+ncol(test_rf)
+nrow(test_rf)
+head(test_rf)
+
+
+train_rf$No.show <- factor(train_rf$No.show)
+
+test_rf$No.show <- factor(test_rf$No.show)
+
+
+
+train$Reverse <- as.factor(train$Reverse)
+
+# Create a Random Forest model with default parameters
+model1_rf <- randomForest(No.show ~ ., data = train_rf, importance = TRUE)
+model1_rf
+
+model2 <- randomForest(No.show ~ ., data = train_rf, ntree = 500, mtry = 6, type=classification, importance = TRUE)
+model2
+
+
+# prediction on test data
+
+predValid_2 <- predict(model2, test_rf, type = "class")
+
+table(predValid_2,test_rf$No.show)
+
+
+importance(model2)
+
+model3 <- randomForest(No.show ~ ., data = train_rf, ntree = 500, mtry = 7, type=classification, importance = TRUE)
+model3
+
+
+# prediction on test data
+
+predValid_3 <- predict(model3, test_rf, type = "class")
+
+table(predValid_3,test_rf$No.show)
+
+
+
+model4 <- randomForest(No.show ~ ., data = train_rf, ntree = 500, mtry = 11, type=classification, importance = TRUE)
+model4
+
+
+# prediction on test data
+
+predValid_4 <- predict(model4, test_rf, type = "class")
+
+table(predValid_4,test_rf$No.show)
+
+
+getwd()
+
+setwd("/Users/sangujohn/Documents/DM2_Project")
+
+train_rf<- read.csv(file="/Users/sangujohn/Documents/DM2_Project/train_rf.csv", header=TRUE, sep=",")
+
+test_rf<- read.csv(file="/Users/sangujohn/Documents/DM2_Project/test_rf.csv", header=TRUE, sep=",")
+
+# Boosting
+     
+library(gbm)
+set.seed(121)
+boost_model1=gbm(No.show ~ .,data=train_rf,distribution="gaussian", n.tree = 10,interaction.depth=4)
+summary(boost_model1)
+
+yhat.boost1=predict(boost_model1,n.tree=10,newdata=test_rf)
+
+yhat.boost1
+table(yhat.boost1,test_rf$No.show)
+
+library(caret)
+
+confusionMatrix(yhat.boost1,test_rf$No.show)
+ 
+nrow(yhat.boost1)    
+
+nrow(test_rf)
+   
+
+chisq.test(train_rf$Alcoholism, train_rf$Gender, correct = FALSE)  
+     
+     
+  colnames(train_rf) 
